@@ -47,7 +47,9 @@ go get -u github.com/jinzhu/gorm
 go get -u github.com/go-sql-driver/mysql
 ```
 
-代码见 （https://github.com/lingjiao0710/ginEssential）@7e36286ce380a2570d70441f8f07b8d3b658c047
+本章代码
+
+https://github.com/lingjiao0710/ginEssential/commit/7e36286ce380a2570d70441f8f07b8d3b658c047
 
 
 
@@ -78,3 +80,6 @@ go build
 ginEssential.exe
 ```
 
+本章代码
+
+https://github.com/lingjiao0710/ginEssential/commit/96d0cf5d48b46555e8b69fd89a05649cb30e0015
