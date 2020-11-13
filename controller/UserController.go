@@ -114,7 +114,12 @@ func Login(ctx *gin.Context) {
 	}
 
 	//发放token
-	token := 123
+	token, err := common.ReleaseToken(user)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "token系统异常"})
+		log.Printf("token error :%v", err)
+		return
+	}
 
 	//返回结果
 	ctx.JSON(http.StatusOK, gin.H{
@@ -122,6 +127,16 @@ func Login(ctx *gin.Context) {
 		"token": token,
 		"msg":   "登录成功",
 	})
+}
+
+func Info(ctx *gin.Context) {
+	user, _ := ctx.Get("user")
+
+	ctx.JSON(
+		http.StatusOK,
+		gin.H{
+			"code": 200,
+			"data": gin.H{"user": user}})
 }
 
 //isTelephoneExist 查询手机号是否存在
