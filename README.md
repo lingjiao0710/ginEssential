@@ -83,3 +83,57 @@ ginEssential.exe
 本章代码
 
 https://github.com/lingjiao0710/ginEssential/commit/96d0cf5d48b46555e8b69fd89a05649cb30e0015
+
+
+
+## 2020-11-13 实现用户登录
+
+routes.go增加登录路由
+
+```go
+r.POST("api/auth/login", controller.Login)
+```
+
+UserContoller.go中实现Login函数
+
+Register函数中保存密码需要进行加密
+
+```go
+//密码不能明文存储，需要对密码进行加密
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "密码加密错误"})
+		return
+	}
+```
+
+Login函数中判断密码并返回token
+
+```go
+//判断手机号是否存在
+	var user model.User
+	db.Where("telephone = ?", telephone).First(&user)
+	if user.ID == 0 {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "用户不存在"})
+		return
+	}
+
+	//判断密码
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "密码错误"})
+		return
+	}
+
+	//发放token
+	token := 123
+
+	//返回结果
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":  200,
+		"token": token,
+		"msg":   "登录成功",
+	})
+```
+
+本章代码
+
