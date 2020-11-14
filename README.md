@@ -137,3 +137,169 @@ Login函数中判断密码并返回token
 
 本章代码
 
+https://github.com/lingjiao0710/ginEssential/commit/d9ea46bacc95a35348485a13b61451a8a19b3f29
+
+
+
+## 2020-11-13 JWT配合中间件用户认证
+
+安装jwt-go
+
+```go
+go get github.com/dgrijalva/jwt-go
+```
+
+在common包中新建jwt.go，增加ReleaseToken函数用于生成token，ParseToken用于解析token
+
+```go
+package common
+
+import (
+	"lingjiao0710/ginEssential/model"
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
+)
+
+var jwtKey = []byte("secret_crect_string")
+
+//Claims tocken结构体
+type Claims struct {
+	UserID uint
+	jwt.StandardClaims
+}
+
+//ReleaseToken 生成token
+func ReleaseToken(user model.User) (string, error) {
+	//expirationTime token过期时间
+	expirationTime := time.Now().Add(7 * 24 * time.Hour)
+
+	claims := &Claims{
+		UserID: user.ID,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: expirationTime.Unix(),
+			IssuedAt:  time.Now().Unix(),
+			Issuer:    "lingjiao0710",
+			Subject:   "user token",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func ParseToken(tokenString string) (*jwt.Token, *Claims, error) {
+	claims := &Claims{}
+
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	return token, claims, err
+}
+```
+
+新建middleware包，增加AuthMiddleware.go用于添加中间件
+
+```go
+func AuthMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		//获取authorization header
+		tokenString := ctx.GetHeader("Authorization")
+
+		//校验token格式
+		if tokenString == "" || !strings.HasPrefix(tokenString, "Bearer ") {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "权限不足"})
+			ctx.Abort()
+			return
+		}
+
+		tokenString = tokenString[7:]
+
+		token, claims, err := common.ParseToken(tokenString)
+		if err != nil || !token.Valid {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "权限不足"})
+			ctx.Abort()
+			return
+		}
+
+		//验证通过后获取claim中的userID
+		userID := claims.UserID
+		db := common.GetDB()
+
+		var user model.User
+		db.First(&user, userID)
+
+		//用户
+		if user.ID == 0 {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "权限不足"})
+			ctx.Abort()
+			return
+		}
+
+		//用户存在 将user信息写入上下文
+		ctx.Set("user", user)
+		ctx.Next()
+	}
+}
+```
+
+routes.go中增加中间件路由
+
+```go
+r.GET("api/auth/info", middleware.AuthMiddleware(), controller.Info)
+```
+
+UserController.go中新增Info，返回user数据
+
+```go
+func Info(ctx *gin.Context) {
+	user, _ := ctx.Get("user")
+
+	ctx.JSON(
+		http.StatusOK,
+		gin.H{
+			"code": 200,
+			"data": gin.H{"user": user}})
+}
+```
+
+修改Login.go支持发放token
+
+```go
+//判断密码
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "密码错误"})
+		return
+	}
+
+	//发放token
+	token, err := common.ReleaseToken(user)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "token系统异常"})
+		log.Printf("token error :%v", err)
+		return
+	}
+
+	//返回结果
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":  200,
+		"token": token,
+		"msg":   "登录成功",
+	})
+```
+
+修改完成后，先post一条login消息，复制生成的token，再获取info消息中填入复制的token，返回正确的user数据：
+
+![image-20201113161847994](https://i.loli.net/2020/11/13/qBAnysjtZWUbm64.png)
+
+![image-20201113161911247](https://i.loli.net/2020/11/13/62vYi7oy1H5ljDT.png)
+
+本章代码
+
+https://github.com/lingjiao0710/ginEssential/commit/31818002516688a1416056ee833e2e97606a8c4b
